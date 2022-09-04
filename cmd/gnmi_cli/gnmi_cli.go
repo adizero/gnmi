@@ -39,20 +39,20 @@ import (
 	"unicode/utf8"
 
 	"flag"
-	
+
 	log "github.com/golang/glog"
-	"golang.org/x/crypto/ssh/terminal"
-	"google.golang.org/protobuf/encoding/prototext"
 	"github.com/openconfig/gnmi/cli"
 	"github.com/openconfig/gnmi/client"
 	"github.com/openconfig/gnmi/client/flags"
 	gclient "github.com/openconfig/gnmi/client/gnmi"
+	"golang.org/x/crypto/ssh/terminal"
+	"google.golang.org/protobuf/encoding/prototext"
 
 	gpb "github.com/openconfig/gnmi/proto/gnmi"
 )
 
 var (
-	q   = client.Query{TLS: &tls.Config{}}
+	q   = client.Query{TLS: &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12}}
 	mu  sync.Mutex
 	cfg = cli.Config{Display: func(b []byte) {
 		defer mu.Unlock()
@@ -272,12 +272,26 @@ func executeSet(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not create a gNMI client: %v", err)
 	}
-	response, err := c.(*gclient.Client).Set(ctx, r)
-	if err != nil {
-		return fmt.Errorf("failed to apply Set: %w", err)
+
+	if cfg.Count == 0 {
+		cfg.Count = 1
 	}
-	cfg.Display([]byte(prototext.Format(response)))
-	return nil
+
+	var lastError error = nil
+	var i uint
+	for i = 0; i < cfg.Count; i++ {
+		response, err := c.(*gclient.Client).Set(ctx, r)
+		if err != nil {
+			lastError = fmt.Errorf("failed to apply Set: %w", err)
+			if cfg.Count <= 1 {
+				return lastError
+			}
+		} else {
+			cfg.Display([]byte(prototext.Format(response)))
+		}
+	}
+
+	return lastError
 }
 
 func executeSubscribe(ctx context.Context) error {
