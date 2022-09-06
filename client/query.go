@@ -154,6 +154,14 @@ type Query struct {
 	Queries []Path
 	// Type of query to perform.
 	Type Type
+	// Encoding to use in response
+	// Named values are these, allows any number (should work as long as target supports it)
+	// "JSON": 0,
+	// "BYTES": 1,
+	// "PROTO": 2,
+	// "ASCII": 3,
+	// "JSON_IETF": 4,
+	Encoding int32
 	// Timeout is the connection timeout for the query. It will *not* prevent a
 	// slow (or streaming) query from completing, this only affects the initial
 	// connection and broken connection detection.

@@ -33,6 +33,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -74,12 +75,16 @@ var (
 	setReqFlag       = flag.Bool("include_set_req", false, `When set, CLI will pretty print the inputted set request`)
 	withUserPass     = flag.Bool("with_user_pass", false, "When set, CLI will prompt for username/password to use when connecting to a target.")
 	withPerRPCAuth   = flag.Bool("with_per_rpc_auth", false, "Use per RPC auth.")
+	username = flag.String("username", "", "If specified, uses username/password credentials.")
+	password = flag.String("password", "", "The password matching the provided username.")
 
 	// Certificate files.
 	insecureFlag = flag.Bool("insecure", false, "use insecure GRPC connection.")
 	caCert       = flag.String("ca_crt", "", "CA certificate file. Used to verify server TLS certificate.")
 	clientCert   = flag.String("client_crt", "", "Client certificate file. Used for client certificate-based authentication.")
 	clientKey    = flag.String("client_key", "", "Client private key file. Used for client certificate-based authentication.")
+
+	encodingName = flag.String("encoding", "JSON_IETF", "value encoding format to be used")
 )
 
 func init() {
@@ -142,6 +147,8 @@ func main() {
 		if err != nil {
 			log.Exit(err)
 		}
+	} else if *username != "" {
+		q.Credentials = &client.Credentials{ Username: *username, Password: *password }
 	}
 
 	if *caCert != "" {
@@ -316,6 +323,26 @@ func executeSubscribe(ctx context.Context) error {
 	if q.Type = cli.QueryType(*queryType); q.Type == client.Unknown {
 		return errors.New("--query_type must be one of: (o, once, p, polling, s, streaming)")
 	}
+
+	var encoding int32
+	encoding64, err := strconv.ParseInt(*encodingName, 10, 32)
+	if err != nil {
+		var ok bool
+		encoding, ok = gpb.Encoding_value[*encodingName]
+		if !ok {
+			var gnmiEncodingList []string
+			for _, name := range gpb.Encoding_name {
+				gnmiEncodingList = append(gnmiEncodingList, name)
+			}
+			return fmt.Errorf("Invalid encoding %s. Supported encodings: %s",
+							  *encodingName, strings.Join(gnmiEncodingList, ", "))
+		}
+	} else {
+		encoding = int32(encoding64)
+	}
+
+	q.Encoding = encoding
+
 	// Parse queryFlag into appropriate format.
 	if len(*queryFlag) == 0 {
 		return errors.New("--query must be set")

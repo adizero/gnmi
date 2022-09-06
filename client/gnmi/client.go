@@ -264,6 +264,7 @@ func subscribe(q client.Query) (*gpb.SubscribeRequest, error) {
 	if q.UpdatesOnly {
 		s.Subscribe.UpdatesOnly = true
 	}
+    s.Subscribe.Encoding = gpb.Encoding(q.Encoding)
 	for _, qq := range q.Queries {
 		pp, err := ygot.StringToPath(pathToString(qq), ygot.StructuredPath, ygot.StringSlicePath)
 		if err != nil {
